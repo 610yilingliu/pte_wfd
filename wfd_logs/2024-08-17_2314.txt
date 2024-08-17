@@ -1,0 +1,12 @@
+WFD Question Number 5
+Enter Sentence You heard: WFD Question Number 6
+Enter Sentence You heard: Wrong Answer, answer is:  Americans have typically defined the process of plant growth in quantitative terms.
+WFD Question Number 7
+Enter Sentence You heard: Wrong Answer, answer is:  Animals raised in captivity behave differently than their wild counterparts.
+WFD Question Number 8
+Enter Sentence You heard: WFD Question Number 9
+Enter Sentence You heard: Wrong Answer, answer is:  Native speakers are exempt from the language tests in their own language.
+WFD Question Number 10
+Enter Sentence You heard: Wrong Answer, answer is:  Nurses can specialize in clinical work or management.
+Result Saved to  ./wfd/output\wfd_test.csv
+Reviewed 6 Questions
