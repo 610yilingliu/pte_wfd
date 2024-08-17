@@ -67,6 +67,10 @@ class wfd_reviewer:
         return os.path.normpath(path)
 
     def first_time_init(self, path):
+        """
+        需要读取新的csv文件时使用。如果你只想读取不想做其他的，自行把self.wfd_table存到csv中即可
+        后面加一句self.wfd_table.to_csv(你想存的路径, index = False, encoding = 'utf8')的事
+        """
         path = os.path.join(self.input_folder, path)
         data = pd.read_csv(path, sep = '|', encoding = 'utf8')
         data['wrong'] = 0
@@ -78,22 +82,23 @@ class wfd_reviewer:
         self.wfd_table = data
 
     def attach_new_csv(self, path):
-        # 读取新的 CSV 文件
+        """
+        有新周预测的时候用，会根据去除标点和额外空格后的md5值来判断是否有重复.
+        会移除在新预测中不再出现的行，并且初始化新增的题目
+        如果你想把老表也存下来就在做这一步之前self.wfd_table.to_csv(你想存的路径, index = False, encoding = 'utf8')
+        """
         new_data = pd.read_csv(os.path.join(self.input_folder, path))
+        new_data['md5'] = new_data['English Content'].apply(self.calculate_md5)
         time = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
         self.wfd_table.to_csv(os.path.join(self.input_folder, 'wfd_table' + time + '.csv'), index = False, encoding = 'gbk')
-        # 找出 wfd_table 中 English Content 不在 new_data 中的行，并将这些行删除
-        self.wfd_table = self.wfd_table[self.wfd_table['English Content'].isin(new_data['English Content'])]
-
-        # 找出 new_data 中 English Content 不在 wfd_table 中的行
-        new_rows = new_data[~new_data['English Content'].isin(self.wfd_table['English Content'])]
+        self.wfd_table = self.wfd_table[self.wfd_table['md5'].isin(new_data['md5'])]
+        new_rows = new_data[~new_data['md5'].isin(self.wfd_table['md5'])]
 
         # 初始化新行的列
         new_rows['wrong'] = 0
         new_rows['reviewed'] = 0
         new_rows['wrong_date'] = pd.Series([[] for _ in range(len(new_rows))])
         new_rows['wrong_record'] = pd.Series([[] for _ in range(len(new_rows))])
-        new_rows['md5'] = new_rows['English Content'].apply(self.calculate_md5)
         new_rows['mp3_path'] = new_rows['md5'].apply(lambda x: os.path.join(self.mp3_folder, x + '.mp3'))
 
         # 将新行添加到 wfd_table 中
@@ -101,6 +106,11 @@ class wfd_reviewer:
             
 
     def generate_mp3(self):
+        """
+        调用google tts api生成mp3并存储。文件名就是文件夹+去除标点和额外空格后的英文内容的md5值
+        写这个function的目的是不每次听写都找google生成一次语音，否则经费爆炸
+        这里设置成了1.2倍速美音，支持列表见：https://cloud.google.com/speech-to-text/docs/speech-to-text-supported-languages?hl=zh-cn
+        """
         voice = texttospeech.VoiceSelectionParams(
             language_code="en-US",
             name="en-US-Studio-M",
@@ -122,11 +132,17 @@ class wfd_reviewer:
         print(f'{cnt} MP3 Generated')
 
     def load_existed_data(self, input_path):
+        """
+        加载已有练习记录，并在已有练习记录上更新
+        """
         self.wfd_table = pd.read_csv(os.path.join(self.input_folder, input_path))
         self.wfd_table['wrong_date'] = self.wfd_table['wrong_date'].apply(eval)
         self.wfd_table['wrong_record'] = self.wfd_table['wrong_record'].apply(eval)
 
     def review(self, output_path, prob_range = 'all'):
+        """
+        主要功能，prob_range可以是'all'或者一个list，list里面是要复习的题目范围，比如[1, 10]就是复习第1到第10题
+        """
         if prob_range == 'all':
             for i in range(len(self.wfd_table)):
                 print(f'WFD Question Number {i + 1}')
@@ -170,6 +186,9 @@ class wfd_reviewer:
         
     @count_calls
     def checker(self, target, mp3_path):
+        """
+        比较输入和语音文本，保留了WFD考试的无限试词+无视大小写机制
+        """
         playsound(mp3_path)
         stud_input = input('Enter Sentence You heard: ')
         if stud_input == 'exit':
