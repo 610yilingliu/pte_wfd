@@ -69,10 +69,10 @@ class wfd_reviewer:
     def first_time_init(self, path):
         """
         需要读取新的csv文件时使用。如果你只想读取不想做其他的，自行把self.wfd_table存到csv中即可
-        后面加一句self.wfd_table.to_csv(你想存的路径, index = False, encoding = 'utf8')的事
+        后面加一句self.wfd_table.to_csv(你想存的路径, index = False, encoding = 'gbk')的事
         """
         path = os.path.join(self.input_folder, path)
-        data = pd.read_csv(path, sep = '|', encoding = 'utf8')
+        data = pd.read_csv(path, sep = '|')
         data['wrong'] = 0
         data['reviewed'] = 0
         data['wrong_date'] = pd.Series([[] for _ in range(len(data))])
@@ -85,7 +85,7 @@ class wfd_reviewer:
         """
         有新周预测的时候用，会根据去除标点和额外空格后的md5值来判断是否有重复.
         会移除在新预测中不再出现的行，并且初始化新增的题目
-        如果你想把老表也存下来就在做这一步之前self.wfd_table.to_csv(你想存的路径, index = False, encoding = 'utf8')
+        如果你想把老表也存下来就在做这一步之前self.wfd_table.to_csv(你想存的路径, index = False, encoding = 'gbk')
         """
         new_data = pd.read_csv(os.path.join(self.input_folder, path))
         new_data['md5'] = new_data['English Content'].apply(self.calculate_md5)
@@ -100,9 +100,12 @@ class wfd_reviewer:
         new_rows['wrong_date'] = pd.Series([[] for _ in range(len(new_rows))])
         new_rows['wrong_record'] = pd.Series([[] for _ in range(len(new_rows))])
         new_rows['mp3_path'] = new_rows['md5'].apply(lambda x: os.path.join(self.mp3_folder, x + '.mp3'))
+        
 
         # 将新行添加到 wfd_table 中
         self.wfd_table = pd.concat([self.wfd_table, new_rows], ignore_index=True)
+        self.wfd_table = self.wfd_table.reset_index(drop=True)
+        self.sfd_table['Question Number'] = self.sfd_table.index + 1
             
 
     def generate_mp3(self):
@@ -135,13 +138,14 @@ class wfd_reviewer:
         """
         加载已有练习记录，并在已有练习记录上更新
         """
-        self.wfd_table = pd.read_csv(os.path.join(self.input_folder, input_path))
+        self.wfd_table = pd.read_csv(os.path.join(self.input_folder, input_path), encoding = 'gbk')
         self.wfd_table['wrong_date'] = self.wfd_table['wrong_date'].apply(eval)
         self.wfd_table['wrong_record'] = self.wfd_table['wrong_record'].apply(eval)
 
     def review(self, output_path, prob_range = 'all'):
         """
         主要功能，prob_range可以是'all'或者一个list，list里面是要复习的题目范围，比如[1, 10]就是复习第1到第10题
+        新增功能：prob_range也可以是md5值（供checker调用）
         """
         if prob_range == 'all':
             for i in range(len(self.wfd_table)):
@@ -161,10 +165,29 @@ class wfd_reviewer:
                     self.wfd_table['wrong'][i] += 1
                     self.wfd_table['reviewed'][i] += 1
                     self.wfd_table['wrong_record'][i].append(stud_input)
-        else:
+        elif type(prob_range[0]) == int:
             prob_range_start = prob_range[0] - 1
             prob_range_end = prob_range[1]
             for i in range(prob_range_start, prob_range_end):
+                print(f'WFD Question Number {i + 1}')
+                content = self.wfd_table['English Content'][i]
+                mp3_path = self.wfd_table['mp3_path'][i]
+                check_res, call_cnt = self.checker(content, mp3_path)
+                res, stud_input = check_res
+                if res == 'exit':
+                    self.save_result(output_path)
+                    print(f'Reviewed {call_cnt} Questions')
+                    return
+                if res == True:
+                    self.wfd_table['reviewed'][i] += 1
+                else:
+                    self.wfd_table['wrong_date'][i].append(datetime.now().strftime("%Y-%m-%d"))
+                    self.wfd_table['wrong'][i] += 1
+                    self.wfd_table['reviewed'][i] += 1
+                    self.wfd_table['wrong_record'][i].append(stud_input)
+        else:
+            for md5 in prob_range:
+                i = self.wfd_table[self.wfd_table['md5'] == md5].index[0]
                 print(f'WFD Question Number {i + 1}')
                 content = self.wfd_table['English Content'][i]
                 mp3_path = self.wfd_table['mp3_path'][i]
@@ -225,12 +248,20 @@ class wfd_reviewer:
         self.wfd_table.to_csv(os.path.join(self.output_folder, output_path), index = False, encoding = 'gbk')
         print('Result Saved to ', os.path.join(self.output_folder, output_path))
 
+    def review_wrong_questions(self, output_path, treadshold = 1):
+        """
+        复习错题，treadshold是错题次数的下限，比如1就是只复习错了一次的题目
+        """
+        wrong_questions = self.wfd_table[self.wfd_table['wrong'] >= treadshold]
+        md5_ls = wrong_questions['md5'].tolist()
+        self.review(output_path, md5_ls)
 
 if __name__ == '__main__':
     start_time_str = datetime.now().strftime("%Y-%m-%d_%H%M")
     sys.stdout = Logger("./wfd_logs/" + start_time_str + ".txt")
 
-    reviewer = wfd_reviewer()
-    reviewer.first_time_init('wfd_316.csv')
+    reviewer = wfd_reviewer(input_folder='./output')
+    # reviewer.first_time_init('wfd_316.csv')
     # reviewer.generate_mp3()
-    reviewer.review(prob_range=[5, 10], output_path='wfd_test.csv')
+    reviewer.load_existed_data('wfd.csv')
+    reviewer.review(prob_range=[26, 35], output_path='wfd.csv')
