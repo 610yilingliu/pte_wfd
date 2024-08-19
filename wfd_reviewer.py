@@ -147,6 +147,23 @@ class wfd_reviewer:
         主要功能，prob_range可以是'all'或者一个list，list里面是要复习的题目范围，比如[1, 10]就是复习第1到第10题
         新增功能：prob_range也可以是md5值（供checker调用）
         """
+        def updater(i, res):
+            if res == 'exit':
+                self.save_result(output_path)
+                print(f'Reviewed {call_cnt} Questions')
+                return True
+            if res == True:
+                self.wfd_table['reviewed'][i] += 1
+            else:
+                self.wfd_table['wrong_date'][i].append(datetime.now().strftime("%Y-%m-%d"))
+                self.wfd_table['wrong'][i] += 1
+                self.wfd_table['reviewed'][i] += 1
+                self.wfd_table['wrong_record'][i].append(stud_input)
+
+                input('Press Enter to Continue')
+
+            return False
+
         if prob_range == 'all':
             for i in range(len(self.wfd_table)):
                 print(f'WFD Question Number {i + 1}')
@@ -154,17 +171,10 @@ class wfd_reviewer:
                 mp3_path = self.wfd_table['mp3_path'][i]
                 check_res, call_cnt = self.checker(content, mp3_path)
                 res, stud_input = check_res
-                if res == 'exit':
-                    self.save_result(output_path)
-                    print(f'Reviewed {call_cnt} Questions')
+                is_end = updater(i, res)
+                if is_end:
                     return
-                if res == True:
-                    self.wfd_table['reviewed'][i] += 1
-                else:
-                    self.wfd_table['wrong_date'][i].append(datetime.now().strftime("%Y-%m-%d"))
-                    self.wfd_table['wrong'][i] += 1
-                    self.wfd_table['reviewed'][i] += 1
-                    self.wfd_table['wrong_record'][i].append(stud_input)
+
         elif type(prob_range[0]) == int:
             prob_range_start = prob_range[0] - 1
             prob_range_end = prob_range[1]
@@ -174,17 +184,9 @@ class wfd_reviewer:
                 mp3_path = self.wfd_table['mp3_path'][i]
                 check_res, call_cnt = self.checker(content, mp3_path)
                 res, stud_input = check_res
-                if res == 'exit':
-                    self.save_result(output_path)
-                    print(f'Reviewed {call_cnt} Questions')
+                is_end = updater(i, res)
+                if is_end:
                     return
-                if res == True:
-                    self.wfd_table['reviewed'][i] += 1
-                else:
-                    self.wfd_table['wrong_date'][i].append(datetime.now().strftime("%Y-%m-%d"))
-                    self.wfd_table['wrong'][i] += 1
-                    self.wfd_table['reviewed'][i] += 1
-                    self.wfd_table['wrong_record'][i].append(stud_input)
         else:
             for md5 in prob_range:
                 i = self.wfd_table[self.wfd_table['md5'] == md5].index[0]
@@ -193,17 +195,10 @@ class wfd_reviewer:
                 mp3_path = self.wfd_table['mp3_path'][i]
                 check_res, call_cnt = self.checker(content, mp3_path)
                 res, stud_input = check_res
-                if res == 'exit':
-                    self.save_result(output_path)
-                    print(f'Reviewed {call_cnt} Questions')
+                is_end = updater(i, res)
+                if is_end:
                     return
-                if res == True:
-                    self.wfd_table['reviewed'][i] += 1
-                else:
-                    self.wfd_table['wrong_date'][i].append(datetime.now().strftime("%Y-%m-%d"))
-                    self.wfd_table['wrong'][i] += 1
-                    self.wfd_table['reviewed'][i] += 1
-                    self.wfd_table['wrong_record'][i].append(stud_input)
+                
         self.save_result(output_path)
         print(f'Reviewed {call_cnt} Questions')
         
@@ -260,8 +255,9 @@ if __name__ == '__main__':
     start_time_str = datetime.now().strftime("%Y-%m-%d_%H%M")
     sys.stdout = Logger("./wfd_logs/" + start_time_str + ".txt")
 
-    reviewer = wfd_reviewer(input_folder='./output')
+    
     # reviewer.first_time_init('wfd_316.csv')
     # reviewer.generate_mp3()
+    reviewer = wfd_reviewer(input_folder='./output')
     reviewer.load_existed_data('wfd.csv')
-    reviewer.review(prob_range=[26, 35], output_path='wfd.csv')
+    reviewer.review(prob_range=[51, 55], output_path='wfd.csv')
