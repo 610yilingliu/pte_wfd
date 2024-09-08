@@ -94,6 +94,8 @@ class wfd_reviewer:
             self.wfd_table.to_csv(os.path.join(self.output_folder, backupname), index = False, encoding = 'gbk')
         self.wfd_table = self.wfd_table[self.wfd_table['md5'].isin(new_data['md5'])]
         new_rows = new_data[~new_data['md5'].isin(self.wfd_table['md5'])]
+        # 不加会导致wrong_date和wrong_record添加错误
+        new_rows.reset_index(drop=True, inplace=True)
 
         # 初始化新行的列
         new_rows['wrong'] = 0
