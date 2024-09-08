@@ -81,16 +81,17 @@ class wfd_reviewer:
         data['mp3_path'] = data['md5'].apply(lambda x: os.path.join(self.mp3_folder, x + '.mp3'))
         self.wfd_table = data
 
-    def attach_new_csv(self, path):
+    def attach_new_csv(self, inputname, outputname, backupname = None):
         """
         有新周预测的时候用，会根据去除标点和额外空格后的md5值来判断是否有重复.
         会移除在新预测中不再出现的行，并且初始化新增的题目
         如果你想把老表也存下来就在做这一步之前self.wfd_table.to_csv(你想存的路径, index = False, encoding = 'gbk')
         """
-        new_data = pd.read_csv(os.path.join(self.input_folder, path))
+        new_data = pd.read_csv(os.path.join(self.input_folder, inputname), sep = '|')
         new_data['md5'] = new_data['English Content'].apply(self.calculate_md5)
         time = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
-        self.wfd_table.to_csv(os.path.join(self.input_folder, 'wfd_table' + time + '.csv'), index = False, encoding = 'gbk')
+        if backupname:
+            self.wfd_table.to_csv(os.path.join(self.output_folder, backupname), index = False, encoding = 'gbk')
         self.wfd_table = self.wfd_table[self.wfd_table['md5'].isin(new_data['md5'])]
         new_rows = new_data[~new_data['md5'].isin(self.wfd_table['md5'])]
 
@@ -105,7 +106,8 @@ class wfd_reviewer:
         # 将新行添加到 wfd_table 中
         self.wfd_table = pd.concat([self.wfd_table, new_rows], ignore_index=True)
         self.wfd_table = self.wfd_table.reset_index(drop=True)
-        self.sfd_table['Question Number'] = self.sfd_table.index + 1
+        self.wfd_table['Question Number'] = self.wfd_table.index + 1
+        self.wfd_table.to_csv(os.path.join(self.output_folder, outputname), index = False, encoding = 'gbk')
             
 
     def generate_mp3(self):
@@ -258,6 +260,8 @@ if __name__ == '__main__':
     
     # reviewer.first_time_init('wfd_316.csv')
     # reviewer.generate_mp3()
-    reviewer = wfd_reviewer(input_folder='./output')
+    reviewer = wfd_reviewer(input_folder='./input', output_folder='./output', mp3_folder='./wfd_mp3')
     reviewer.load_existed_data('wfd.csv')
-    reviewer.review(prob_range=[51, 55], output_path='wfd.csv')
+    reviewer.attach_new_csv('wfd_364.csv', 'wfd_0908.csv')
+    reviewer.generate_mp3()
+    # reviewer.review(prob_range=[81, 90], output_path='wfd.csv')
